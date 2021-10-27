@@ -32,8 +32,11 @@ contract CrowdFunding {
         currentState = possibleState.FUNDING_GOAL_NOT_REACHED;
         contractOwner = msg.sender;
         sponsorFundingContract = _sponsorFundingContract;
-        sponsorFundingContract.setCrowdOwner(contractOwner);
     }
+    
+    fallback() external payable {}
+    
+    receive() external payable {}
     
     modifier onlyIfGoalNotReached() {
         if (currentState == possibleState.FUNDING_GOAL_REACHED) {

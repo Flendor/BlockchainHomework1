@@ -6,8 +6,6 @@ contract SponsorFunding {
     
     uint availableFunds;
     uint sponsorPercentage;
-    address owner;
-    address crowdContractOwner;
     
     constructor (uint _sponsorPercentage) payable {
         if (_sponsorPercentage <= 0 || _sponsorPercentage > 100) {
@@ -17,20 +15,16 @@ contract SponsorFunding {
         sponsorPercentage = _sponsorPercentage;
     }
     
-    modifier onlyByOwner () {
-        require(msg.sender == owner || msg.sender == crowdContractOwner, "Only the contract owners can initiate this action!");
+    modifier onlyByCrowdContract (address payable crowdContractAddress) {
+        require(msg.sender == crowdContractAddress, "Only the Crowd Contract can initiate this action!");
         _;
-    }
-    
-    function setCrowdOwner(address _crowdContractOwner) {
-        crowdContractOwner = _crowdContractOwner;
     }
     
     function getSponsorSumToBeReceivedOrRefunded (uint amount) public view returns (uint) {
         return (amount * sponsorPercentage) / 100;
     }
     
-    function makeSponsorshipTransaction(uint crowdBalance, address payable crowdContractAddress) onlyByOwner external {
+    function makeSponsorshipTransaction(uint crowdBalance, address payable crowdContractAddress) onlyByCrowdContract(crowdContractAddress) external {
         uint totalSponsorSum = getSponsorSumToBeReceivedOrRefunded(crowdBalance);
         if (availableFunds >= totalSponsorSum) {
             crowdContractAddress.transfer(totalSponsorSum);
