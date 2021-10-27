@@ -2,11 +2,16 @@
 
 pragma solidity >=0.8.0 <=0.8.7;
 
+import "SponsorFunding.sol";
+
 contract CrowdFunding {
     
     uint fundingGoal;
-    uint accumulatedSum;
+    uint accumulatedSumExcludingSponsorship;
+    uint accumulatedSumIncludingSponsorship;
     possibleState currentState;
+    address contractOwner;
+    SponsorFunding sponsorFundingContract;
     
     enum possibleState {
         FUNDING_GOAL_NOT_REACHED,
@@ -21,16 +26,31 @@ contract CrowdFunding {
     
     mapping (address => Contributor) contributors;
     
-    constructor (uint _fundingGoal) payable {
+    constructor (uint _fundingGoal, SponsorFunding _sponsorFundingContract) {
         fundingGoal = _fundingGoal;
-        accumulatedSum = 0;
+        accumulatedSumIncludingSponsorship = 0;
         currentState = possibleState.FUNDING_GOAL_NOT_REACHED;
+        contractOwner = msg.sender;
+        sponsorFundingContract = _sponsorFundingContract;
+        sponsorFundingContract.setCrowdOwner(contractOwner);
     }
     
     modifier onlyIfGoalNotReached() {
         if (currentState == possibleState.FUNDING_GOAL_REACHED) {
             revert("Goal already reached! Your operation is not supported anymore.");
         }
+        _;
+    }
+    
+    modifier onlyIfGoalReached() {
+        if (currentState == possibleState.FUNDING_GOAL_NOT_REACHED) {
+            revert("You can send the money only after the goal is reached!");
+        }
+        _;
+    }
+    
+    modifier onlyIfOwner() {
+        require(msg.sender == contractOwner, "Only the contract owner can initiate this action!");
         _;
     }
     
@@ -59,14 +79,12 @@ contract CrowdFunding {
     function contribute() onlyIfGoalNotReached onlyIfContributorHasAccount payable external {
         uint contributionValue = msg.value;
         contributors[msg.sender].contribution += contributionValue;
-        accumulatedSum += contributionValue;
+        accumulatedSumExcludingSponsorship += contributionValue;
+        accumulatedSumIncludingSponsorship += contributionValue;
+        accumulatedSumIncludingSponsorship += sponsorFundingContract.getSponsorSumToBeReceivedOrRefunded(contributionValue);
         
-        if (fundingGoal <= accumulatedSum) {
+        if (fundingGoal <= accumulatedSumIncludingSponsorship) {
             currentState = possibleState.FUNDING_GOAL_REACHED;
-            uint remainingChange = accumulatedSum - fundingGoal;
-            payable(msg.sender).transfer(remainingChange);
-            accumulatedSum = fundingGoal;
-            contributors[msg.sender].contribution -= remainingChange;
         }
     }
     
@@ -78,11 +96,13 @@ contract CrowdFunding {
         else {
             payable(msg.sender).transfer(requestedValue);
             contributors[msg.sender].contribution -= requestedValue;
-            accumulatedSum -= requestedValue;
+            accumulatedSumExcludingSponsorship -= requestedValue;
+            accumulatedSumIncludingSponsorship -= requestedValue;
+            accumulatedSumIncludingSponsorship -= sponsorFundingContract.getSponsorSumToBeReceivedOrRefunded(requestedValue);
         }
     }
     
-    function getCurrentState() public returns (string memory) {
+    function getCurrentState() public view returns (string memory) {
         if (currentState == possibleState.FUNDING_GOAL_NOT_REACHED) {
             return "Funding goal not yet reached!";
         }
@@ -90,5 +110,13 @@ contract CrowdFunding {
         else {
             return "Funding goal was reached!";
         }
+    }
+    
+    function notifySponsorFunding() external onlyIfOwner onlyIfGoalReached {
+        sponsorFundingContract.makeSponsorshipTransaction(accumulatedSumExcludingSponsorship, payable(address(this)));
+    }
+    
+    function transferMoneyToDistributeFunding() external onlyIfOwner onlyIfGoalReached {
+        // distributeFundingContract.distributeFunding{value:fundingGoal}();
     }
 }
