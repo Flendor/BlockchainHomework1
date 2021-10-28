@@ -6,6 +6,9 @@ contract SponsorFunding {
     
     uint availableFunds;
     uint sponsorPercentage;
+    address owner;
+    address payable crowdContractAddress;
+    bool alreadyOfferedSponsorMoney;
     
     constructor (uint _sponsorPercentage) payable {
         if (_sponsorPercentage <= 0 || _sponsorPercentage > 100) {
@@ -13,24 +16,36 @@ contract SponsorFunding {
         }
         availableFunds = msg.value;
         sponsorPercentage = _sponsorPercentage;
+        owner = msg.sender;
+        alreadyOfferedSponsorMoney = false;
     }
     
-    modifier onlyByCrowdContract (address payable crowdContractAddress) {
+    modifier onlyBySponsorFundingOwner () {
+        require(msg.sender == owner, "Only this contract's owner can set the Crowd Contract address!");
+        _;
+    }
+    
+    modifier onlyByCrowdContract () {
         require(msg.sender == crowdContractAddress, "Only the Crowd Contract can initiate this action!");
         _;
+    }
+    
+    function setCrowdContractAddress (address payable _crowdContractAddress) onlyBySponsorFundingOwner external {
+        crowdContractAddress = _crowdContractAddress;
     }
     
     function getSponsorSumToBeReceivedOrRefunded (uint amount) public view returns (uint) {
         return (amount * sponsorPercentage) / 100;
     }
     
-    function makeSponsorshipTransaction(uint crowdBalance, address payable crowdContractAddress) onlyByCrowdContract(crowdContractAddress) external {
+    function makeSponsorshipTransaction(uint crowdBalance) onlyByCrowdContract external {
         uint totalSponsorSum = getSponsorSumToBeReceivedOrRefunded(crowdBalance);
-        if (availableFunds >= totalSponsorSum) {
-            crowdContractAddress.transfer(totalSponsorSum);
+        if (availableFunds >= totalSponsorSum && alreadyOfferedSponsorMoney == false) {
+            payable(msg.sender).transfer(totalSponsorSum);
+            alreadyOfferedSponsorMoney = true;
         }
         else {
-            revert("Not enough available funds in sponsor balance!");
+            revert("Sponsor money was already received or there is not enough money in the sponsor's balance!");
         }
     }
 }

@@ -91,8 +91,7 @@ contract CrowdFunding {
         }
     }
     
-    function refund() onlyIfGoalNotReached onlyIfContributorHasAccount payable external {
-        uint requestedValue = msg.value;
+    function refund(uint requestedValue) onlyIfGoalNotReached onlyIfContributorHasAccount payable external {
         if (requestedValue > contributors[msg.sender].contribution) {
             revert ("You cannot ask for a refund with a higher value than your contribution!");
         }
@@ -115,8 +114,12 @@ contract CrowdFunding {
         }
     }
     
+    function getBalance() external view returns (uint) {
+        return address(this).balance;
+    }
+    
     function notifySponsorFunding() external onlyIfOwner onlyIfGoalReached {
-        sponsorFundingContract.makeSponsorshipTransaction(accumulatedSumExcludingSponsorship, payable(address(this)));
+        sponsorFundingContract.makeSponsorshipTransaction(accumulatedSumExcludingSponsorship);
     }
     
     function transferMoneyToDistributeFunding() external onlyIfOwner onlyIfGoalReached {
