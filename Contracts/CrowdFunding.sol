@@ -3,6 +3,7 @@
 pragma solidity >=0.8.0 <=0.8.7;
 
 import "SponsorFunding.sol";
+import "DistributedFunding.sol";
 
 contract CrowdFunding {
     
@@ -12,6 +13,7 @@ contract CrowdFunding {
     possibleState currentState;
     address contractOwner;
     SponsorFunding sponsorFundingContract;
+    DistributedFunding distributeFundingContract;
     
     enum possibleState {
         FUNDING_GOAL_NOT_REACHED,
@@ -26,12 +28,13 @@ contract CrowdFunding {
     
     mapping (address => Contributor) contributors;
     
-    constructor (uint _fundingGoal, SponsorFunding _sponsorFundingContract) {
+    constructor (uint _fundingGoal, SponsorFunding _sponsorFundingContract, DistributedFunding _distributeFunding) {
         fundingGoal = _fundingGoal;
         accumulatedSumIncludingSponsorship = 0;
         currentState = possibleState.FUNDING_GOAL_NOT_REACHED;
         contractOwner = msg.sender;
         sponsorFundingContract = _sponsorFundingContract;
+        distributeFundingContract = _distributeFunding;
     }
     
     fallback() external payable {}
@@ -122,7 +125,8 @@ contract CrowdFunding {
         sponsorFundingContract.makeSponsorshipTransaction(accumulatedSumExcludingSponsorship);
     }
     
-    function transferMoneyToDistributeFunding() external onlyIfOwner onlyIfGoalReached {
-        // distributeFundingContract.distributeFunding{value:fundingGoal}();
+    function transferMoneyToDistributeFunding() external payable onlyIfOwner onlyIfGoalReached {
+        payable(address(distributeFundingContract)).transfer(accumulatedSumIncludingSponsorship);
+        distributeFundingContract.distributeFunds();
     }
 }
